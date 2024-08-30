@@ -1,6 +1,8 @@
-﻿namespace Tgs.Payment.U2Pay;
+﻿namespace Payment.BigPayz;
 public record BigPayzClientDepositResponse(
     decimal Amount,
     Guid FormId,
-    string ThirdPartyOrderNo,
-    Uri RedirectUrl);
+    Uri RedirectUrl,
+    string Token,
+    string Currency,
+    string Transaction);

@@ -1,4 +1,5 @@
-﻿namespace Tgs.Payment.U2Pay.Client;
-public record U2PayWithdrawResponse(
+﻿namespace Payment.BigPayz.Client;
+public record BigPayzWithdrawResponse(
     Guid FormId,
-    string ThirdPartyOrderNo);
+    string ThirdPartyOrderNo,
+    decimal MerchantBalance);

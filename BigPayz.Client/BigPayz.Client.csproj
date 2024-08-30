@@ -4,16 +4,16 @@
     <TargetFramework>net7.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-	  <RootNamespace>Tgs.Payment.U2Pay.Client</RootNamespace>
+	  <RootNamespace>Payment.BigPayz.Client</RootNamespace>
 	  <SqlQueryToolsConnectionString />
 	  <Version>0.0.4</Version>
 	  <Authors>Raypro</Authors>
 	  <Company>Raypro</Company>
-	  <PackageId>Tgs.Payment.U2Pay.Client</PackageId>
-	  <Title>Tgs.Payment.U2Pay.Client</Title>
+	  <PackageId>Payment.BigPayz.Client</PackageId>
+	  <Title>Payment.BigPayz.Client</Title>
 	  <PackageProjectUrl>https://gitlab.com/rayprosoft/tgs-payment-u2pay</PackageProjectUrl>
 	  <RepositoryUrl>https://gitlab.com/rayprosoft/tgs-payment-u2pay.git</RepositoryUrl>
-	  <PackageTags>Tgs Payment U2Pay</PackageTags>
+	  <PackageTags>Payment BigPayz</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

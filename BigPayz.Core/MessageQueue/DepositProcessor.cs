@@ -2,13 +2,13 @@
 using Microsoft.Extensions.Options;
 using Tgs.Payment.Clients;
 using Tgs.Payment.Protos;
-using Tgs.Payment.U2Pay.Client;
+using Payment.BigPayz.Client;
 using Valhalla.MessageQueue;
 
-namespace Tgs.Payment.U2Pay.MessageQueue;
+namespace Payment.BigPayz.MessageQueue;
 
 internal class DepositProcessor(
-    BigPayzClient u2PayClient,
+    BigPayzClient BigPayzClient,
     IPaymentClient paymentClient,
     IOptions<BigPayzOptions> optionsAccessor)
     : IMessageProcessor<DepositRequest, DepositResponse>
@@ -26,16 +26,14 @@ internal class DepositProcessor(
             BigPayzUtility.SerializerOptions)!;
 
         var order = new DepositOrder(
-            decimal.Parse(data.Amount) * settings.ExchangeRate,
+            decimal.Parse(data.Amount),
+            new Uri(_options.CallbackBaseUrl,"/deposit/callback"),
             settings.FormId,
-            new Uri($"{_options.CallbackBaseUrl}/deposit/callback"),
-            settings.ChannelNo,
-            settings.BankName);
+            settings.PlayerId,
+            settings.ItemDescription);
 
-        var depositResponse = await u2PayClient.DepositAsync(
-            settings.MerchantNo,
-            settings.AppSecret,
-            settings.PrivateKey,
+        var depositResponse = await BigPayzClient.DepositAsync(
+            settings,
             order,
             cancellationToken).ConfigureAwait(false);
 
@@ -45,10 +43,12 @@ internal class DepositProcessor(
                 depositResponse.Amount,
                 depositResponse.FormId,
                 depositResponse.RedirectUrl,
-                depositResponse.ThirdPartyOrderNo));
+                depositResponse.Transaction,
+                depositResponse.Token,
+                depositResponse.Currency));
 
         await paymentClient.ScheduleAsync(
-            "tgs.payment.u2pay.deposit.schedule.reject",
+            "tgs.payment.bigpayz.deposit.schedule.reject",
             settings.FormId,
             DateTime.UtcNow.AddMinutes(60D),
             cancellationToken).ConfigureAwait(false);

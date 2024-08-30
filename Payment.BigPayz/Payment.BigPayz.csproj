@@ -7,7 +7,7 @@
 	<SqlQueryToolsConnectionString />
     <UserSecretsId>059a0349-6150-4891-beb3-a368d9de1fac</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>	
-	<DockerfileTag Condition="$(DockerfileTag) == ''">pgtgs/payment-u2</DockerfileTag>
+	<DockerfileTag Condition="$(DockerfileTag) == ''">pgtgs/payment-bigpayz</DockerfileTag>
   </PropertyGroup>
 	
 	<ItemGroup>
@@ -30,7 +30,7 @@
 	</ItemGroup>
 	
 	<ItemGroup>
-	  <ProjectReference Include="..\U2Pay.Core\BigPayz.Core.csproj" />
+	  <ProjectReference Include="..\BigPayz.Core\BigPayz.Core.csproj" />
 	</ItemGroup>
 	
 </Project>

@@ -1,7 +1,7 @@
 ﻿using Tgs.Payment.Clients;
-using Tgs.Payment.U2Pay.Client;
+using Payment.BigPayz.Client;
 
-namespace Tgs.Payment.U2Pay;
+namespace Payment.BigPayz;
 public record DepositForm(
     Guid Id,
     string PlayerCode,

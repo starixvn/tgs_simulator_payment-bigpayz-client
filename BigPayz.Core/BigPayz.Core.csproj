@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
 	<SqlQueryToolsConnectionString />
     <Nullable>enable</Nullable>
-	<RootNamespace>Tgs.Payment.U2Pay</RootNamespace>
+	<RootNamespace>Payment.BigPayz</RootNamespace>
   </PropertyGroup>
 
 	<ItemGroup>
@@ -24,7 +24,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\U2Pay.Client\BigPayz.Client.csproj" />
+	  <ProjectReference Include="..\BigPayz.Client\BigPayz.Client.csproj" />
 	</ItemGroup>
 	
 </Project>

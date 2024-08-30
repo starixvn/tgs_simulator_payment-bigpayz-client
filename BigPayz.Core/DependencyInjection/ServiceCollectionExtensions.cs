@@ -1,11 +1,11 @@
 ﻿using System.Reflection;
-using Tgs.Payment.U2Pay;
+using Payment.BigPayz;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddU2Pay(
+    public static IServiceCollection AddBigPayz(
        this IServiceCollection services,
        Action<BigPayzOptions> configureOptions,
        Action<IHttpClientBuilder> ConfigureAiClient)

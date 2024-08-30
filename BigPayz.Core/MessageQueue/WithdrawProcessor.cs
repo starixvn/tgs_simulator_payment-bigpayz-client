@@ -2,13 +2,13 @@
 using Microsoft.Extensions.Options;
 using Tgs.Payment.Clients;
 using Tgs.Payment.Protos;
-using Tgs.Payment.U2Pay.Client;
+using Payment.BigPayz.Client;
 using Valhalla.MessageQueue;
 
-namespace Tgs.Payment.U2Pay.MessageQueue;
+namespace Payment.BigPayz.MessageQueue;
 
 internal class WithdrawProcessor(
-    BigPayzClient u2PayClient,
+    BigPayzClient bigPayzClient,
     IPaymentClient paymentClient,
     IOptions<BigPayzOptions> optionsAccessor) : IMessageProcessor<WithdrawRequest, WithdrawResponse>
 {
@@ -24,22 +24,24 @@ internal class WithdrawProcessor(
 
         var order = new WithdrawOrder(
             settings.FormId,
-            decimal.Parse(data.Amount) * settings.ExchangeRate,
-            new Uri(_options.CallbackBaseUrl,"/withdraw/callback"),
+            decimal.Parse(data.Amount),
+            new Uri(_options.CallbackBaseUrl,"withdraw/callback"),
             settings.ReceiverName,
             settings.BankName,
-            settings.BankAccount);
+            settings.BankAccount,
+            settings.BankCode,
+            settings.PlayerIp,
+            settings.CurrencyCode);
 
-        var withdrawResponse = await u2PayClient.WithdrawAsync(
-            settings.MerchantNo,
-            settings.AppSecret,
-            settings.PrivateKey,
+        var withdrawResponse = await bigPayzClient.WithdrawAsync(
+            settings.MerchantCode,
+            settings.ApiKey,
             order,
             cancellationToken).ConfigureAwait(false);
 
         var applyInfo = new BigPayzWithdrawApplyInfo(
             settings,
-            new U2PayWithdrawResponse(withdrawResponse.FormId, withdrawResponse.ThirdPartyOrderNo));
+            new BigPayzWithdrawResponse(withdrawResponse.FormId, withdrawResponse.ThirdPartyOrderNo, withdrawResponse.MerchantBalance));
 
         await paymentClient.SaveWithdrawFormThirdPartyOrderNoAsync(
             settings.FormId,

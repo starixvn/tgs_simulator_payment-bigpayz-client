@@ -1,13 +1,13 @@
 ﻿using System.ComponentModel;
 
-namespace Tgs.Payment.U2Pay.Client;
+namespace Payment.BigPayz.Client;
 public record BigPayzWithdrawSettings(
-    string MerchantNo,
-    string AppSecret,
-    string PrivateKey,
+    string MerchantCode,
+    string ApiKey,
     Guid FormId,
     string ReceiverName,
     string BankName,
     string BankAccount,
-    [property: Description("匯率轉換")]
-    decimal ExchangeRate);
+    string BankCode,
+    string PlayerIp,
+    string CurrencyCode);

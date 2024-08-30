@@ -1,7 +1,7 @@
-﻿namespace Tgs.Payment.U2Pay.Client;
+﻿namespace Payment.BigPayz.Client;
 public record BigPayzDepositReturn
 {
-    public string ThirdPartyOrderNo { get; set; } = default!;
+    public string Transaction { get; set; } = default!;
 
     public decimal OrderAmount { get; set; }
 
@@ -13,7 +13,7 @@ public record BigPayzDepositReturn
 
     public string Sign { get; set; } = default!;
 
-    public decimal AfterExchangeOrderAmount { get; set; }
+    public string ItemDescription { get; set; } = default!;
 
-    public decimal AfterExchangeRealAmount { get; set; }
+    public string ClientName { get; set; } = default!;
 }

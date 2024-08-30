@@ -1,9 +1,9 @@
 ﻿using System.Text.Json;
 using Tgs.Payment.Clients;
-using Tgs.Payment.U2Pay.Client;
+using Payment.BigPayz.Client;
 using Tgs.ServiceUtility;
 
-namespace Tgs.Payment.U2Pay.ApplicationServices;
+namespace Payment.BigPayz.ApplicationServices;
 
 internal class GetWithdrawFormQueryService : IGetService<GetWithdrawFormQuery, WithdrawForm?>
 {

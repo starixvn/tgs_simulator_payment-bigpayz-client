@@ -1,2 +1,2 @@
-﻿namespace Tgs.Payment.U2Pay.ApplicationServices;
+﻿namespace Payment.BigPayz.ApplicationServices;
 public record GetWithdrawFormQuery(Guid FormId);

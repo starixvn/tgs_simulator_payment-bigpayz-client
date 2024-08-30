@@ -1,8 +1,12 @@
-﻿namespace Tgs.Payment.U2Pay;
+﻿namespace Payment.BigPayz;
+
 public record WithdrawOrder(
     Guid FormId,
     decimal Amount,
     Uri CallbackUrl,
     string ReceiverName,
     string BankName,
-    string BankAccount);
+    string BankAccount,
+    string BankCode,
+    string PlayerIp,
+    string CurrencyCode);

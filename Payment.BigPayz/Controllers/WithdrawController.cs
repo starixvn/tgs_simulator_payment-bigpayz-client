@@ -1,12 +1,12 @@
 ﻿using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Tgs.Payment.Clients;
-using Tgs.Payment.U2Pay.ApplicationServices;
-using Tgs.Payment.U2Pay.Client;
-using Tgs.Payment.U2Pay.ViewModels;
+using Payment.BigPayz.ApplicationServices;
+using Payment.BigPayz.Client;
+using Payment.BigPayz.ViewModels;
 using Tgs.ServiceUtility;
 
-namespace Tgs.Payment.U2Pay.Controllers;
+namespace Payment.BigPayz.Controllers;
 
 [Route("[controller]")]
 [ApiController]
@@ -29,7 +29,7 @@ public class WithdrawController : ControllerBase
         [FromForm] CallbackWithdrawViewModel source)
     {
         _logger.LogInformation("{source}", source);
-        var formId = Guid.Parse(source.OrderNo);
+        var formId = Guid.Parse(source.RefId);
 
         var withdrawForm = await getService
             .GetAsync(new(formId), HttpContext.RequestAborted)
@@ -41,14 +41,9 @@ public class WithdrawController : ControllerBase
             return "fail";
         }
 
-        var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(JsonSerializer.Serialize(source))!;
-
-        var sign = source.Sign;
-        var hash = hasher.ComputeHash(
-            withdrawForm.ApplyInfo!.Settings.PrivateKey,
-            dict.Select(kv => new KeyValuePair<string, string?>(
-                kv.Key,
-                kv.Value == null ? "" : kv.Value.ToString())));
+        var data = new string[] { source.InvoiceNo, source.Status.ToString(), source.Currency, source.Amount.ToString(), source.PaymentDate };
+        var sign = source.Signature;
+        var hash = hasher.ComputeHash(withdrawForm.ApplyInfo!.Settings.ApiKey, data);
 
         _logger.LogInformation("Compute hash: {hash}, sign: {sign}", hash, sign);
 
@@ -63,18 +58,17 @@ public class WithdrawController : ControllerBase
         var paymentReturn = new BigPayzWithdrawReturn()
         {
             FormId = formId,
-            Amount = source.Amount,
+            ActualAmount = source.Amount,
             Sign = sign,
-            ThirdPartyOrderNo = source.TradeNo,
-            Status = status,
-            AfterExchangeAmount = source.Amount / withdrawForm.ApplyInfo.Settings.ExchangeRate
+            ThirdPartyOrderNo = source.InvoiceNo,
+            Status = source.StatusMessage,
         };
 
         var fsm = PaymentStateMachineFactory.CreateWithdrawStateMachine(withdrawForm.Status);
 
-        switch (status)
+        switch (source.StatusMessage)
         {
-            case "PAID":
+            case "Success":
                 if (fsm.CanFire(PaymentTrigger.PaymentWithdrawCompleted))
                 {
                     await fsm.FireAsync(PaymentTrigger.PaymentWithdrawCompleted).ConfigureAwait(false);
@@ -84,6 +78,7 @@ public class WithdrawController : ControllerBase
                         paymentReturn: JsonSerializer.Serialize(
                             paymentReturn,
                             BigPayzUtility.SerializerOptions),
+                        actualAmount: source.Amount,
                         cancellationToken: HttpContext.RequestAborted).ConfigureAwait(false);
 
                     await paymentClient.PaidWithdrawAsync(
@@ -93,7 +88,7 @@ public class WithdrawController : ControllerBase
 
                 break;
 
-            case "CANCELLED":
+            case "Reject":
                 if (fsm.CanFire(PaymentTrigger.Reject))
                 {
                     await fsm.FireAsync(PaymentTrigger.Reject).ConfigureAwait(false);
@@ -103,6 +98,7 @@ public class WithdrawController : ControllerBase
                         paymentReturn: JsonSerializer.Serialize(
                             paymentReturn,
                             BigPayzUtility.SerializerOptions),
+                        actualAmount: source.Amount,
                         cancellationToken: HttpContext.RequestAborted).ConfigureAwait(false);
 
                     await paymentClient.RejectWithdrawAsync(

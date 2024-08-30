@@ -1,12 +1,12 @@
 ﻿using System.Text.Json;
 using Tgs.Payment.Protos;
-using Tgs.Payment.U2Pay.Client;
+using Payment.BigPayz.Client;
 using Valhalla.MessageQueue;
 
-namespace Tgs.Payment.U2Pay.MessageQueue;
+namespace Payment.BigPayz.MessageQueue;
 
 internal class GetBalanceProcessor(
-    BigPayzClient u2PayClient)
+    BigPayzClient bigPayzClient)
     : IMessageProcessor<PaymentBalanceRequest, PaymentBalanceResponse>
 {
     public async ValueTask<PaymentBalanceResponse> HandleAsync(
@@ -19,10 +19,10 @@ internal class GetBalanceProcessor(
             data.BrandPaymentSettings,
             BigPayzUtility.SerializerOptions)!;
 
-        var result = await u2PayClient.QueryBalanceAsync(
-            settings.MerchantNo,
-            settings.AppSecret,
-            settings.PrivateKey,
+        var result = await bigPayzClient.QueryBalanceAsync(
+            settings.MerchantCode,
+            settings.CurrencyCode,
+            settings.ApiKey,
             cancellationToken).ConfigureAwait(false);
 
         return new PaymentBalanceResponse

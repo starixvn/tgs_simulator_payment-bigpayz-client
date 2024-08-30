@@ -1,12 +1,10 @@
 ﻿using System.ComponentModel;
 
-namespace Tgs.Payment.U2Pay.Client;
+namespace Payment.BigPayz.Client;
 public record BigPayzDepositSettings(
-    string MerchantNo,
-    string AppSecret,
-    string PrivateKey,
+    string MerchantCode,
+    string Currency,
+    string ApiKey,
     Guid FormId,
-    int ChannelNo,
-    string BankName,
-    [property: Description("匯率轉換")]
-    decimal ExchangeRate);
+    string PlayerId,
+    string ItemDescription);

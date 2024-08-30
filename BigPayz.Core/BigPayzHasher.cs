@@ -2,34 +2,23 @@
 using System.Text;
 using Microsoft.Extensions.Logging;
 
-namespace Tgs.Payment.U2Pay;
+namespace Payment.BigPayz;
 
-public class BigPayzHasher
+public class BigPayzHasher(ILogger<BigPayzHasher> logger)
 {
-    private readonly ILogger<BigPayzHasher> _logger;
+    private readonly ILogger<BigPayzHasher> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-    public BigPayzHasher(ILogger<BigPayzHasher> logger)
+    public string ComputeHash(string privateKey, IEnumerable<string> data)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+        var content = string.Join("", data);
 
-    public string ComputeHash(string privateKey, IEnumerable<KeyValuePair<string, string?>> dict)
-    {
-        var content = string.Join(
-            "&",
-            dict.OrderBy(kvp => kvp.Key, StringComparer.Ordinal)
-                .Select(p => $"{p.Key}={p.Value}"));
+        _logger.LogTrace("FullText: {content}", content);
 
-        var fullText = $"{content}{privateKey}";
+        var enc = Encoding.UTF8;
+        var hmac = new HMACSHA256(enc.GetBytes(content));
+        hmac.Initialize();
+        var buffer = enc.GetBytes(privateKey);
 
-        _logger.LogTrace("FullText: {fullText}", fullText);
-
-        var digest = SHA256.HashData(Encoding.UTF8.GetBytes(fullText));
-
-        var sha256Hash = Convert.ToHexString(digest).ToLower();
-
-        var hash = MD5.HashData(Encoding.UTF8.GetBytes(sha256Hash));
-
-        return Convert.ToHexString(hash).ToUpper();
+        return BitConverter.ToString(hmac.ComputeHash(buffer)).Replace("-", "").ToLower();
     }
 }

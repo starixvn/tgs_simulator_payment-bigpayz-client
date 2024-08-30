@@ -1,15 +1,13 @@
-﻿namespace Tgs.Payment.U2Pay.Client;
+﻿namespace Payment.BigPayz.Client;
 public record BigPayzWithdrawReturn
 {
     public string ThirdPartyOrderNo { get; set; } = default!;
 
-    public decimal Amount { get; set; }
+    public decimal ActualAmount { get; set; }
 
     public Guid FormId { get; set; }
 
     public string Status { get; set; } = default!;
 
     public string Sign { get; set; } = default!;
-
-    public decimal AfterExchangeAmount { get; set; }
 }

@@ -1,4 +1,4 @@
-﻿namespace Tgs.Payment.U2Pay.MessageQueue;
+﻿namespace Payment.BigPayz.MessageQueue;
 
 public static class ProcessorTypes
 {

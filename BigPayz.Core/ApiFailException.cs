@@ -1,4 +1,4 @@
-﻿namespace Tgs.Payment.U2Pay;
+﻿namespace Payment.BigPayz;
 
 public class ApiFailException : Exception
 {

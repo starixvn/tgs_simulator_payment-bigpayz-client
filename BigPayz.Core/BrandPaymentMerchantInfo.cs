@@ -1,5 +1,5 @@
-﻿namespace Tgs.Payment.U2Pay;
+﻿namespace Payment.BigPayz;
 internal record BrandPaymentMerchantInfo(
-    string MerchantNo,
-    string AppSecret,
-    string PrivateKey);
+    string MerchantCode,
+    string ApiKey,
+    string CurrencyCode);

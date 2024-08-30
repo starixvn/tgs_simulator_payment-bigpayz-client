@@ -1,12 +1,12 @@
 ﻿using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Tgs.Payment.Clients;
-using Tgs.Payment.U2Pay.ApplicationServices;
-using Tgs.Payment.U2Pay.Client;
-using Tgs.Payment.U2Pay.ViewModels;
+using Payment.BigPayz.ApplicationServices;
+using Payment.BigPayz.Client;
+using Payment.BigPayz.ViewModels;
 using Tgs.ServiceUtility;
 
-namespace Tgs.Payment.U2Pay.Controllers;
+namespace Payment.BigPayz.Controllers;
 
 [Route("[controller]")]
 [ApiController]
@@ -28,7 +28,7 @@ public class DepositController : ControllerBase
         [FromServices] IPaymentClient paymentClient,
         [FromForm] CallbackDepositViewModel source)
     {
-        var formId = Guid.Parse(source.OrderNo);
+        var formId = Guid.Parse(source.ItemId);
 
         var depositForm = await getService
             .GetAsync(new(formId), HttpContext.RequestAborted)
@@ -40,14 +40,10 @@ public class DepositController : ControllerBase
             return "fail";
         }
 
-        var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(JsonSerializer.Serialize(source))!;
-
-        var sign = source.Sign;
+        var sign = source.Signature;
         var hash = hasher.ComputeHash(
-            depositForm.ApplyInfo!.Settings.PrivateKey,
-            dict.Select(kv => new KeyValuePair<string, string?>(
-                kv.Key,
-                kv.Value == null ? "" : kv.Value.ToString())));
+            depositForm.ApplyInfo!.Settings.ApiKey,
+            [source.Transaction, source.Status.ToString(), source.Amount.ToString(), source.CreatedAt]);
 
         _logger.LogInformation("Compute hash: {hash}, sign: {sign}", hash, sign);
 
@@ -59,21 +55,21 @@ public class DepositController : ControllerBase
 
         var paymentReturn = new BigPayzDepositReturn()
         {
-            Status = source.Status,
+            Status = source.StatusMessage,
             FormId = formId,
-            ThirdPartyOrderNo = source.TradeNo,
-            RealAmount = source.Paid,
-            OrderAmount = source.Amount,
+            Transaction = source.Transaction,
+            RealAmount = source.Amount,
+            OrderAmount = depositForm.Amount,
             Sign = sign,
-            AfterExchangeRealAmount = source.Paid / depositForm.ApplyInfo.Settings.ExchangeRate,
-            AfterExchangeOrderAmount = source.Amount / depositForm.ApplyInfo.Settings.ExchangeRate
+            ClientName = source.ClientName,
+            ItemDescription = source.ItemDescription
         };
 
         var fsm = PaymentStateMachineFactory.CreateDepositStateMachine(depositForm.Status);
 
         switch (paymentReturn.Status)
         {
-            case "PAID":
+            case "Success":
                 if (fsm.CanFire(PaymentTrigger.PaymentDepositCompleted))
                 {
                     await fsm.FireAsync(PaymentTrigger.PaymentDepositCompleted).ConfigureAwait(false);
@@ -83,12 +79,14 @@ public class DepositController : ControllerBase
                         paymentReturn: JsonSerializer.Serialize(
                             paymentReturn,
                             BigPayzUtility.SerializerOptions),
+                        actualAmount: source.Amount,
+                        handlingFee: depositForm.Amount - source.Amount, 
                         cancellationToken: HttpContext.RequestAborted).ConfigureAwait(false);
 
                     await paymentClient.ApproveDepositAsync(
                         depositForm.Id,
                         depositForm.BrandId,
-                        paymentReturn.AfterExchangeOrderAmount,
+                        paymentReturn.RealAmount,
                         HttpContext.RequestAborted).ConfigureAwait(false);
                 }
 
@@ -97,7 +95,7 @@ public class DepositController : ControllerBase
             default:
                 _logger.LogWarning("FormId:{formId}, ThirdPartyOrderNo:{ThirdPartyOrderNo} , payment Status:{status}",
                     formId,
-                    paymentReturn.ThirdPartyOrderNo,
+                    paymentReturn.Transaction,
                     paymentReturn.Status);
                 return "fail";
         }

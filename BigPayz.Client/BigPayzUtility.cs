@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Tgs.Payment.U2Pay.Client;
+namespace Payment.BigPayz.Client;
 
 public class BigPayzUtility
 {

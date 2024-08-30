@@ -3,7 +3,7 @@ using Tgs.Payment.Clients;
 using Tgs.Payment.Protos;
 using Valhalla.MessageQueue;
 
-namespace Tgs.Payment.U2Pay.MessageQueue;
+namespace Payment.BigPayz.MessageQueue;
 
 internal class DepositTimeoutCheckHandler(
     IPaymentServiceClient paymentServiceClient,
@@ -66,7 +66,7 @@ internal class DepositTimeoutCheckHandler(
             _logger.LogError(ex, "Process deposit timeout error!");
 
             await paymentClient.ScheduleAsync(
-                "tgs.payment.u2pay.deposit.schedule.reject",
+                "tgs.payment.bigpayz.deposit.schedule.reject",
                 formId,
                 DateTime.UtcNow.AddMinutes(10D),
                 cancellationToken).ConfigureAwait(false);

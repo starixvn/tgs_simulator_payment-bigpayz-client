@@ -7,8 +7,8 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Tgs.MessageQueue.Nats.Serializers;
-using Tgs.Payment.U2Pay;
-using Tgs.Payment.U2Pay.MessageQueue;
+using Payment.BigPayz;
+using Payment.BigPayz.MessageQueue;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseSentry();
@@ -27,14 +27,14 @@ builder.Logging
                 () => Environment.MachineName));
         });
     });
-    
+
 
 builder.Services
     .AddControllers();
 
-builder.Services    
-    .AddU2Pay(
-        options => builder.Configuration.GetSection("U2Pay").Bind(options),
+builder.Services
+    .AddBigPayz(
+        options => builder.Configuration.GetSection("BigPayz").Bind(options),
         clientBuilder => clientBuilder
             .ConfigureHttpClient((sp, http) =>
             {
@@ -42,7 +42,7 @@ builder.Services
 
                 http.BaseAddress = options.PaymentApiUrl;
             })
-            .AddLoggingHandler<BigPayzOptions>())    
+            .AddLoggingHandler<BigPayzOptions>())
     .AddPaymentClient()
     .AddPaymentServiceClient(httpBuilder => httpBuilder
         .ConfigureHttpClient((sp, http) =>
@@ -65,20 +65,21 @@ builder.Services
         .ConfigureResolveConnection(sp => sp.GetRequiredKeyedService<NatsConnection>("Nats"))
         .AddProcessor(
             ProcessorTypes.DepositProcessorType,
-            "tgs.payment.u2pay.deposit",
-            "tgs.payment.u2pay.deposit")
+            "tgs.payment.bigpayz.deposit",
+            "tgs.payment.bigpayz.deposit")
         .AddProcessor(
             ProcessorTypes.WithdrawProcessorType,
-            "tgs.payment.u2pay.withdraw",
-            "tgs.payment.u2pay.withdraw")
+            "tgs.payment.bigpayz.withdraw",
+            "tgs.payment.bigpayz.withdraw")
         .AddHandler(
             ProcessorTypes.DepositTimeoutCheckHandlerType,
-            $"tgs.payment.u2pay.deposit.schedule.reject",
-            $"tgs.payment.u2pay.deposit.schedule.reject")
-        .AddProcessor(
+            "tgs.payment.bigpayz.deposit.schedule.reject",
+            "tgs.payment.bigpayz.deposit.schedule.reject")
+        .AddHandler(
             ProcessorTypes.GetBalanceProcessorType,
-            "tgs.payment.u2pay.balance",
-            "tgs.payment.u2pay.balance"))
+            "tgs.payment.bigpayz.balance",
+            "tgs.payment.bigpayz.balance")
+        )
     .AddNatsGlobPatternExchange("*");
 
 builder.Services
@@ -89,7 +90,7 @@ builder.Services
         logging.MediaTypeOptions.AddText("application/x-www-form-urlencoded");
         logging.MediaTypeOptions.AddText("text/html");
         logging.MediaTypeOptions.AddText("multipart/form-data");
-    })    
+    })
     .AddHealthChecks()
     .Services
     .AddOpenTelemetry()
@@ -138,5 +139,5 @@ app.Use(async (context, next) =>
         _ = await stream.ReadToEndAsync().ConfigureAwait(false);
     }
 });
-SentrySdk.CaptureMessage($"Started result Tgs-U2Pay at {DateTime.Now.ToString()} at {Environment.MachineName}");
+SentrySdk.CaptureMessage($"Started result Tgs-BigPayz at {DateTime.Now.ToString()} at {Environment.MachineName}");
 app.Run();

@@ -1,8 +1,11 @@
-﻿using System.Text.Json.Nodes;
-using Microsoft.Extensions.Configuration;
+﻿using System.Net.Mime;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
+using Payment.BigPayz.Client;
 
-namespace Tgs.Payment.U2Pay;
+namespace Payment.BigPayz;
 
 public class BigPayzClient(
     HttpClient httpClient,
@@ -10,58 +13,55 @@ public class BigPayzClient(
     TimeProvider timeProvider,
     ILogger<BigPayzClient> logger)
 {
-    public async ValueTask<BigPayzClientDepositResponse> DepositAsync(string merchantNo, string appSecert, string privateKey, DepositOrder order, CancellationToken cancellationToken = default)
+    public async ValueTask<BigPayzClientDepositResponse> DepositAsync(BigPayzDepositSettings settings, DepositOrder order, CancellationToken cancellationToken = default)
     {
-        var now = timeProvider.GetUtcNow();
-
-        var dict = new Dictionary<string, string?>
+        var dict = new Dictionary<string, string>
         {
-            ["merchantNo"] = merchantNo,
-            ["orderNo"] = order.FormId.ToString("N"),
-            ["userNo"] = "",
-            ["channelNo"] = order.ChannelNo.ToString(),
-            ["amount"] = order.Amount.ToString(),
-            ["discount"] = "",
-            ["bankName"] = order.BankName,
-            ["extra"] = "",
-            ["datetime"] = now.ToString("yyyy-MM-dd HH:mm:ss"),
-            ["notifyUrl"] = order.CallbackUrl.AbsoluteUri,
-            ["time"] = now.ToUnixTimeSeconds().ToString(),
-            ["appSecret"] = appSecert,
+            ["MerchantCode"] = settings.MerchantCode,
+            ["ReturnURL"] = "",
+            ["FailedReturnURL"] = "",
+            ["HTTPPostURL"] = order.CallbackUrl.AbsoluteUri,
+            ["Amount"] = order.Amount.ToString(),
+            ["Currency"] = settings.Currency,
+            ["ItemID"] = order.FormId.ToString(),
+            ["ItemDescription"] = order.ItemDescription,
+            ["PlayerId"] = order.PlayerId,
         };
 
-        var excludeKeys = new string[] { "userName", "channelNo", "payeeName", "amountBeforeFixed", "returnUrl", "appSecret", "bankName" };
+        var values = new string[] { dict["MerchantCode"], dict["ItemID"], dict["Currency"], dict["Amount"] };
+        var hash = hasher.ComputeHash(settings.ApiKey, values);
+        dict["Hash"] = hash;
 
-        var sign = hasher.ComputeHash(privateKey, dict.Where(x => !excludeKeys.Contains(x.Key)));
-        dict["sign"] = sign;
-
-        var request = new HttpRequestMessage(HttpMethod.Post, "order/create")
+        var request = new HttpRequestMessage(HttpMethod.Post, "Payin/DepositV2")
         {
-            Content = new FormUrlEncodedContent(dict)
+            Content = new StringContent(JsonSerializer.Serialize(dict), Encoding.UTF8, MediaTypeNames.Application.Json)
         };
+        request.Headers.Add("Authorization", $"Basic {settings.ApiKey}");
 
         var response = await httpClient
             .SendAsync(request, cancellationToken)
             .ConfigureAwait(false);
 
-        _ = response.EnsureSuccessStatusCode();
-
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-
-        logger.LogInformation("U2PayClient Deposit Body:{body}", body);
-
         var node = JsonNode.Parse(body) ?? throw new ApiFailException("Deposit response can't read.");
 
-        if (node["code"]!.GetValue<int>() != 0)
-            throw new ApiFailException(node["text"]!.GetValue<string>());
+        if (response.StatusCode != System.Net.HttpStatusCode.OK)
+            throw new ApiFailException(node["message"]!.GetValue<string>());
+        if (node["status"]!.GetValue<int>() != 0)
+            throw new ApiFailException($"Error in Payment Provider with status {node["status"]!.GetValue<int>()}");
+
+        logger.LogInformation("BigPayzClient Deposit Body:{body}", body);
 
         return new BigPayzClientDepositResponse(
-            Amount: node["amount"]!.GetValue<decimal>(),
-            FormId: Guid.Parse(node["orderNo"]!.GetValue<string>()),
-            ThirdPartyOrderNo: node["tradeNo"]!.GetValue<string>(),
-            RedirectUrl: new Uri(node["targetUrl"]!.GetValue<string>()));
+            Amount: node["Amount"]!.GetValue<decimal>(),
+            FormId: order.FormId,
+            RedirectUrl: new Uri(node["redirect_to"]!.GetValue<string>()),
+            Token: node["token"]!.GetValue<string>(),
+            Currency: node["Currency"]!.GetValue<string>(),
+            Transaction: node["transaction"]!.ToString());
     }
 
+    /*
     public async ValueTask<string> QueryDepositFormStatusAsync(string merchantNo, string appSecert, string privateKey, Guid formId, CancellationToken cancellationToken = default)
     {
         var dict = new Dictionary<string, string?>
@@ -98,75 +98,76 @@ public class BigPayzClient(
 
         return node["status"]!.GetValue<string>();
     }
+    */
 
-    public async ValueTask<BigPayzClientWithdrawResponse> WithdrawAsync(string merchantNo, string appSecert, string privateKey, WithdrawOrder order, CancellationToken cancellationToken = default)
+    public async ValueTask<BigPayzClientWithdrawResponse> WithdrawAsync(string merchantNo, string privateKey, WithdrawOrder order, CancellationToken cancellationToken = default)
     {
         var now = timeProvider.GetUtcNow();
 
-        var dict = new Dictionary<string, string?>
+        var dict = new Dictionary<string, string>
         {
-            ["merchantNo"] = merchantNo,
-            ["orderNo"] = order.FormId.ToString("N"),
+            ["merchantCode"] = merchantNo,
+            ["ref_id"] = order.FormId.ToString(),
+            ["player_username"] = order.ReceiverName,
+            ["player_ip"] = order.PlayerIp,
+            ["currency_code"] = order.CurrencyCode,
             ["amount"] = order.Amount.ToString(),
-            ["name"] = order.ReceiverName,
-            ["bankName"] = order.BankName,
-            ["bankAccount"] = order.BankAccount,
-            ["mobile"] = "",
-            ["datetime"] = now.ToString("yyyy-MM-dd HH:mm:ss"),
+            ["bank_code"] = order.BankCode,
+            ["beneficiary_account"] = order.BankAccount,
+            ["beneficiary_name"] = order.BankName,
+            ["ifsc"] = order.BankCode,
             ["notifyUrl"] = order.CallbackUrl.AbsoluteUri,
-            ["reverseUrl"] = order.CallbackUrl.AbsoluteUri,
-            ["extra"] = "",
-            ["time"] = now.ToUnixTimeSeconds().ToString(),
-            ["appSecret"] = appSecert,
         };
 
-        var excludeKeys = new string[] { "bankBranch", "memo", "appSecret" };
+        var data = new string[] { dict["merchantCode"], dict["ref_id"], dict["player_username"], dict["player_ip"], 
+            dict["currency_code"], dict["amount"], dict["bank_code"], dict["beneficiary_account"], dict["beneficiary_name"] };
 
-        var sign = hasher.ComputeHash(privateKey, dict.Where(x => !excludeKeys.Contains(x.Key)));
-        dict["sign"] = sign;
+        var sign = hasher.ComputeHash(privateKey, data);
+        dict["hash"] = sign;
 
-        var request = new HttpRequestMessage(HttpMethod.Post, "payout/create")
+        var request = new HttpRequestMessage(HttpMethod.Post, "Payout/Withdrawal")
         {
-            Content = new FormUrlEncodedContent(dict)
+            Content = new StringContent(JsonSerializer.Serialize(dict), Encoding.UTF8, MediaTypeNames.Application.Json)
         };
+        request.Headers.Add("Authorization", $"Basic {privateKey}");
 
         var response = await httpClient
             .SendAsync(request, cancellationToken)
             .ConfigureAwait(false);
 
-        _ = response.EnsureSuccessStatusCode();
-
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-
-        logger.LogInformation("U2PayClient Withdraw Body:{body}", body);
-
         var node = JsonNode.Parse(body) ?? throw new ApiFailException("Withdraw response can't read.");
 
-        if (node["code"]!.GetValue<int>() != 0)
-            throw new ApiFailException(node["text"]!.GetValue<string>());
+        if (response.StatusCode != System.Net.HttpStatusCode.OK)
+            throw new ApiFailException(node["error_message"]!.GetValue<string>());
+
+        if (node["error_code"]!.GetValue<int>() != 0)
+            throw new ApiFailException($"Error in Payment Provider with status {node["error_message"]!.GetValue<int>()}");
+
+        logger.LogInformation("BigPayzClient Withdraw Body:{body}", body);
 
         return new BigPayzClientWithdrawResponse(
-            Amount: node["amount"]!.GetValue<decimal>(),
-            FormId: Guid.Parse(node["orderNo"]!.GetValue<string>()),
-            ThirdPartyOrderNo: node["tradeNo"]!.GetValue<string>());
+            FormId: order.FormId,
+            ThirdPartyOrderNo: node["invoice_number"]!.GetValue<string>(),
+            MerchantBalance: node["merchant_balance"]!.GetValue<decimal>());
     }
 
-    public async ValueTask<decimal> QueryBalanceAsync(string merchantNo, string appSecret, string privateKey, CancellationToken cancellationToken = default)
+
+    public async ValueTask<decimal> QueryBalanceAsync(string merchantCode, string currencyCode, string privateKey, CancellationToken cancellationToken = default)
     {
         var dict = new Dictionary<string, string?>
         {
-            ["merchantNo"] = merchantNo,
-            ["time"] = timeProvider.GetUtcNow().ToUnixTimeSeconds().ToString(),
-            ["appSecret"] = appSecret,
+            ["merchant_code"] = merchantCode,
         };
 
-        var sign = hasher.ComputeHash(privateKey, dict.Where(x => x.Key != "appSecret"));
+        var sign = hasher.ComputeHash(privateKey, [dict["merchant_code"]!]);
         dict["sign"] = sign;
 
-        var request = new HttpRequestMessage(HttpMethod.Post, "order/status")
+        var request = new HttpRequestMessage(HttpMethod.Post, "Payout/GetBalance")
         {
-            Content = new FormUrlEncodedContent(dict)
+            Content = new StringContent(JsonSerializer.Serialize(dict), Encoding.UTF8, MediaTypeNames.Application.Json)
         };
+        request.Headers.Add("Authorization", $"Basic {privateKey}");
 
         var response = await httpClient
             .SendAsync(request, cancellationToken)
@@ -180,11 +181,14 @@ public class BigPayzClient(
 
         var node = JsonNode.Parse(body) ?? throw new ApiFailException("Query Merchant Balance response can't read.");
 
-        if (node["code"]!.GetValue<int>() != 0)
-            throw new ApiFailException(node["text"]!.GetValue<string>());
+        if (node["error_code"]!.GetValue<int>() != 0)
+            throw new ApiFailException(node["error_message"]!.GetValue<string>());
 
-        var balance = node["balance"]!.GetValue<decimal>();
+        var balances = node["info"]!.GetValue<(string CurrencyCode, decimal RunningBalance)[]>();
+
+        var balance = balances.Where(x=>string.Equals(x.CurrencyCode, currencyCode)).Select(x=>x.RunningBalance).FirstOrDefault();
 
         return balance;
     }
+    
 }

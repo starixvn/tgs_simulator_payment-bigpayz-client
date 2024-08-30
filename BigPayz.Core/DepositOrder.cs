@@ -1,7 +1,9 @@
-﻿namespace Tgs.Payment.U2Pay;
+﻿namespace Payment.BigPayz;
 public record DepositOrder(
     decimal Amount,
-    Guid FormId,
     Uri CallbackUrl,
-    int ChannelNo,
-    string BankName);
+    Guid FormId,
+    string PlayerId,
+    string ItemDescription);
+
+
