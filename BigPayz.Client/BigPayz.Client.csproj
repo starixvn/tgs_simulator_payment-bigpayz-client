@@ -1,18 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 	  <RootNamespace>Payment.BigPayz.Client</RootNamespace>
 	  <SqlQueryToolsConnectionString />
 	  <Version>0.0.4</Version>
-	  <Authors>Raypro</Authors>
-	  <Company>Raypro</Company>
+	  <Authors>Lumi</Authors>
+	  <Company>Lumi</Company>
 	  <PackageId>Payment.BigPayz.Client</PackageId>
 	  <Title>Payment.BigPayz.Client</Title>
-	  <PackageProjectUrl>https://gitlab.com/rayprosoft/tgs-payment-u2pay</PackageProjectUrl>
-	  <RepositoryUrl>https://gitlab.com/rayprosoft/tgs-payment-u2pay.git</RepositoryUrl>
+	  <PackageProjectUrl>https://git3.nexdev.net/tgs/simulator/payment-bigpayz-client</PackageProjectUrl>
+	  <RepositoryUrl>https://git3.nexdev.net/tgs/simulator/payment-bigpayz-client.git</RepositoryUrl>
 	  <PackageTags>Payment BigPayz</PackageTags>
   </PropertyGroup>
 

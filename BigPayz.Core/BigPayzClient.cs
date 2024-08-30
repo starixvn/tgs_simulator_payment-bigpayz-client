@@ -177,7 +177,7 @@ public class BigPayzClient(
 
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
-        logger.LogInformation("U2PayClient Query Merchant Balance Body:{body}", body);
+        logger.LogInformation("BigPayz Query Merchant Balance Body:{body}", body);
 
         var node = JsonNode.Parse(body) ?? throw new ApiFailException("Query Merchant Balance response can't read.");
 
