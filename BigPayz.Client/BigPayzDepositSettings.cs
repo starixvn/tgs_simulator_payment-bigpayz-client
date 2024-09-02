@@ -7,4 +7,5 @@ public record BigPayzDepositSettings(
     string ApiKey,
     Guid FormId,
     string PlayerId,
-    string ItemDescription);
+    string ItemDescription,
+    string ChannelType);

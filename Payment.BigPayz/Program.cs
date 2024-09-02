@@ -9,6 +9,7 @@ using OpenTelemetry.Trace;
 using Tgs.MessageQueue.Nats.Serializers;
 using Payment.BigPayz;
 using Payment.BigPayz.MessageQueue;
+using System;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseSentry();
@@ -43,6 +44,7 @@ builder.Services
                 http.BaseAddress = options.PaymentApiUrl;
             })
             .AddLoggingHandler<BigPayzOptions>())
+    .AddBigPayzDepositHandler()
     .AddPaymentClient()
     .AddPaymentServiceClient(httpBuilder => httpBuilder
         .ConfigureHttpClient((sp, http) =>
@@ -54,15 +56,15 @@ builder.Services
 
 builder.Services
     .AddKeyedSingleton(
-        "Nats",
+        "NatQueue",
         (sp, _) => new NatsConnection(NatsOpts.Default with
         {
-            Url = builder.Configuration.GetConnectionString("Nats")!,
+            Url = builder.Configuration.GetConnectionString("NatQueue")!,
             SerializerRegistry = TgsNatsSerializerRegistration.Default
         }))
-    .AddMessageQueue()
-    .AddNatsMessageQueue(config => config
-        .ConfigureResolveConnection(sp => sp.GetRequiredKeyedService<NatsConnection>("Nats"))
+        .AddMessageQueue()
+        .AddNatsMessageQueue(config => config
+        .ConfigureResolveConnection(sp => sp.GetRequiredKeyedService<NatsConnection>("NatQueue"))
         .AddProcessor(
             ProcessorTypes.DepositProcessorType,
             "tgs.payment.bigpayz.deposit",
@@ -73,13 +75,12 @@ builder.Services
             "tgs.payment.bigpayz.withdraw")
         .AddHandler(
             ProcessorTypes.DepositTimeoutCheckHandlerType,
-            "tgs.payment.bigpayz.deposit.schedule.reject",
-            "tgs.payment.bigpayz.deposit.schedule.reject")
-        .AddHandler(
+            $"tgs.payment.bigpayz.deposit.schedule.reject",
+            $"tgs.payment.bigpayz.deposit.schedule.reject")
+        .AddProcessor(
             ProcessorTypes.GetBalanceProcessorType,
             "tgs.payment.bigpayz.balance",
-            "tgs.payment.bigpayz.balance")
-        )
+            "tgs.payment.bigpayz.balance"))
     .AddNatsGlobPatternExchange("*");
 
 builder.Services

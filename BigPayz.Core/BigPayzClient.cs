@@ -11,28 +11,19 @@ public class BigPayzClient(
     HttpClient httpClient,
     BigPayzHasher hasher,
     TimeProvider timeProvider,
+    IDepositHandlerFactory depositHandlerFactory,
     ILogger<BigPayzClient> logger)
 {
     public async ValueTask<BigPayzClientDepositResponse> DepositAsync(BigPayzDepositSettings settings, DepositOrder order, CancellationToken cancellationToken = default)
     {
-        var dict = new Dictionary<string, string>
-        {
-            ["MerchantCode"] = settings.MerchantCode,
-            ["ReturnURL"] = "",
-            ["FailedReturnURL"] = "",
-            ["HTTPPostURL"] = order.CallbackUrl.AbsoluteUri,
-            ["Amount"] = order.Amount.ToString(),
-            ["Currency"] = settings.Currency,
-            ["ItemID"] = order.FormId.ToString(),
-            ["ItemDescription"] = order.ItemDescription,
-            ["PlayerId"] = order.PlayerId,
-        };
+        var depositHandler = depositHandlerFactory.GetDepositHandler(settings.ChannelType);
+        var (dict, api, keysHash) = depositHandler.MakeDepositRequest(order, settings);
 
-        var values = new string[] { dict["MerchantCode"], dict["ItemID"], dict["Currency"], dict["Amount"] };
-        var hash = hasher.ComputeHash(settings.ApiKey, values);
-        dict["Hash"] = hash;
+        var valuesToHash = dict.Where(x => keysHash.Contains(x.Key)).Select(x => x.Value).ToList();
+        var hash = hasher.ComputeHash(settings.ApiKey, valuesToHash);
+        dict.Add("hash", hash);
 
-        var request = new HttpRequestMessage(HttpMethod.Post, "Payin/DepositV2")
+        var request = new HttpRequestMessage(HttpMethod.Post, api)
         {
             Content = new StringContent(JsonSerializer.Serialize(dict), Encoding.UTF8, MediaTypeNames.Application.Json)
         };
@@ -45,20 +36,9 @@ public class BigPayzClient(
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         var node = JsonNode.Parse(body) ?? throw new ApiFailException("Deposit response can't read.");
 
-        if (response.StatusCode != System.Net.HttpStatusCode.OK)
-            throw new ApiFailException(node["message"]!.GetValue<string>());
-        if (node["status"]!.GetValue<int>() != 0)
-            throw new ApiFailException($"Error in Payment Provider with status {node["status"]!.GetValue<int>()}");
-
         logger.LogInformation("BigPayzClient Deposit Body:{body}", body);
 
-        return new BigPayzClientDepositResponse(
-            Amount: node["Amount"]!.GetValue<decimal>(),
-            FormId: order.FormId,
-            RedirectUrl: new Uri(node["redirect_to"]!.GetValue<string>()),
-            Token: node["token"]!.GetValue<string>(),
-            Currency: node["Currency"]!.GetValue<string>(),
-            Transaction: node["transaction"]!.ToString());
+        return depositHandler.MakeResponse(order, response.StatusCode, body);
     }
 
     /*
@@ -119,7 +99,7 @@ public class BigPayzClient(
             ["notifyUrl"] = order.CallbackUrl.AbsoluteUri,
         };
 
-        var data = new string[] { dict["merchantCode"], dict["ref_id"], dict["player_username"], dict["player_ip"], 
+        var data = new string[] { dict["merchantCode"], dict["ref_id"], dict["player_username"], dict["player_ip"],
             dict["currency_code"], dict["amount"], dict["bank_code"], dict["beneficiary_account"], dict["beneficiary_name"] };
 
         var sign = hasher.ComputeHash(privateKey, data);
@@ -186,9 +166,9 @@ public class BigPayzClient(
 
         var balances = node["info"]!.GetValue<(string CurrencyCode, decimal RunningBalance)[]>();
 
-        var balance = balances.Where(x=>string.Equals(x.CurrencyCode, currencyCode)).Select(x=>x.RunningBalance).FirstOrDefault();
+        var balance = balances.Where(x => string.Equals(x.CurrencyCode, currencyCode)).Select(x => x.RunningBalance).FirstOrDefault();
 
         return balance;
     }
-    
+
 }

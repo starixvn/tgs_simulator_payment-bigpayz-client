@@ -31,6 +31,7 @@
 	
 	<ItemGroup>
 	  <ProjectReference Include="..\BigPayz.Core\BigPayz.Core.csproj" />
+	  <ProjectReference Include="..\BigPayz.RequestMaker\BigPayz.DepositHandler.csproj" />
 	</ItemGroup>
 	
 </Project>

@@ -27,7 +27,7 @@ internal class DepositProcessor(
 
         var order = new DepositOrder(
             decimal.Parse(data.Amount),
-            new Uri(_options.CallbackBaseUrl,"/deposit/callback"),
+            new Uri(_options.CallbackBaseUrl,"deposit/callback"),
             settings.FormId,
             settings.PlayerId,
             settings.ItemDescription);
