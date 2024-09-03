@@ -13,7 +13,5 @@ public record BigPayzDepositReturn
 
     public string Sign { get; set; } = default!;
 
-    public string ItemDescription { get; set; } = default!;
-
-    public string ClientName { get; set; } = default!;
+    public string ExtendData { get; set; } = default!;
 }

@@ -10,25 +10,37 @@ namespace Payment.BigPayz.Controllers;
 
 [Route("[controller]")]
 [ApiController]
-public class DepositController : ControllerBase
+public class DepositController(ILogger<DepositController> logger,
+    BigPayzHasher hasher,
+    IGetService<GetDepositFormQuery,
+    DepositForm?> getService,
+    IPaymentServiceClient paymentServiceClient,
+    IPaymentClient paymentClient) : ControllerBase
 {
-    private readonly ILogger<DepositController> _logger;
-
-    public DepositController(ILogger<DepositController> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     [HttpPost("callback", Name = "NotifyDeposit")]
     [Consumes("application/x-www-form-urlencoded")]
     public async Task<string> DepositCallbackAsync(
-    [FromServices] BigPayzHasher hasher,
-        [FromServices] IGetService<GetDepositFormQuery, DepositForm?> getService,
-        [FromServices] IPaymentServiceClient paymentServiceClient,
-        [FromServices] IPaymentClient paymentClient,
         [FromForm] CallbackDepositViewModel source)
     {
-        var formId = Guid.Parse(source.ItemId);
+        var keysHash = new string[] { source.Transaction, source.Status.ToString(), source.Amount.ToString(), source.CreatedAt };
+
+        var paymentReturn = new BigPayzDepositReturn()
+        {
+            Status = source.StatusMessage,
+            FormId = Guid.Parse(source.ItemId),
+            Transaction = source.Transaction,
+            RealAmount = source.Amount,
+            Sign = source.Signature,
+            ExtendData = JsonSerializer.Serialize(source)
+        };
+
+        return await HandleDepositCallBackAsync(paymentReturn, keysHash).ConfigureAwait(false);
+    }
+
+    private async Task<string> HandleDepositCallBackAsync(BigPayzDepositReturn paymentReturn, IEnumerable<string> keysHash)
+    {
+        var formId = paymentReturn.FormId;
 
         var depositForm = await getService
             .GetAsync(new(formId), HttpContext.RequestAborted)
@@ -36,34 +48,21 @@ public class DepositController : ControllerBase
 
         if (depositForm == null)
         {
-            _logger.LogWarning("Can't found deposit form({id}).", formId);
+            logger.LogWarning("Can't found deposit form({id}).", formId);
             return "fail";
         }
 
-        var sign = source.Signature;
         var hash = hasher.ComputeHash(
             depositForm.ApplyInfo!.Settings.ApiKey,
-            [source.Transaction, source.Status.ToString(), source.Amount.ToString(), source.CreatedAt]);
+            keysHash);
 
-        _logger.LogInformation("Compute hash: {hash}, sign: {sign}", hash, sign);
+        logger.LogInformation("Compute hash: {hash}, sign: {sign}", hash, paymentReturn.Sign);
 
-        if (sign != hash)
+        if (paymentReturn.Sign != hash)
         {
-            _logger.LogWarning("Sign value invalid. input: {sign}, compute: {hash}", sign, hash);
+            logger.LogWarning("Sign value invalid. input: {sign}, compute: {hash}", paymentReturn.Sign, hash);
             return "fail";
         }
-
-        var paymentReturn = new BigPayzDepositReturn()
-        {
-            Status = source.StatusMessage,
-            FormId = formId,
-            Transaction = source.Transaction,
-            RealAmount = source.Amount,
-            OrderAmount = depositForm.Amount,
-            Sign = sign,
-            ClientName = source.ClientName,
-            ItemDescription = source.ItemDescription
-        };
 
         var fsm = PaymentStateMachineFactory.CreateDepositStateMachine(depositForm.Status);
 
@@ -79,8 +78,8 @@ public class DepositController : ControllerBase
                         paymentReturn: JsonSerializer.Serialize(
                             paymentReturn,
                             BigPayzUtility.SerializerOptions),
-                        actualAmount: source.Amount,
-                        handlingFee: depositForm.Amount - source.Amount, 
+                        actualAmount: paymentReturn.RealAmount,
+                        handlingFee: depositForm.Amount - paymentReturn.RealAmount,
                         cancellationToken: HttpContext.RequestAborted).ConfigureAwait(false);
 
                     await paymentClient.ApproveDepositAsync(
@@ -93,7 +92,7 @@ public class DepositController : ControllerBase
                 break;
 
             default:
-                _logger.LogWarning("FormId:{formId}, ThirdPartyOrderNo:{ThirdPartyOrderNo} , payment Status:{status}",
+                logger.LogWarning("FormId:{formId}, ThirdPartyOrderNo:{ThirdPartyOrderNo} , payment Status:{status}",
                     formId,
                     paymentReturn.Transaction,
                     paymentReturn.Status);
@@ -101,5 +100,26 @@ public class DepositController : ControllerBase
         }
 
         return "success";
+    }
+
+    [HttpPost("callback/promptpay", Name = "NotifyDepositPromptPay")]
+    [Consumes("application/x-www-form-urlencoded")]
+    public async Task<string> DepositCallbackPromptPayAsync(
+        [FromForm] CallBackDepositPromptPayViewModel source)
+    {
+        var keysHash = new string[] { source.InvoiceNo, source.ReceiverBank, source.ReceiverAccount, source.Currency, source.Amount.ToString(), source.PaymentDate };
+
+        var paymentReturn = new BigPayzDepositReturn()
+        {
+            Status = source.StatusMessage,
+            FormId = Guid.Parse(source.RefId),
+            Transaction = source.InvoiceNo,
+            RealAmount = source.Amount,
+            OrderAmount = source.OriginalAmount,
+            Sign = source.Signature,
+            ExtendData = JsonSerializer.Serialize(source)
+        };
+
+        return await HandleDepositCallBackAsync(paymentReturn, keysHash).ConfigureAwait(false);
     }
 }
